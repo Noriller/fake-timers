@@ -84,6 +84,7 @@ const globalObject = require("@sinonjs/commons").global;
  * @property {function(): void} uninstall Uninstall the clock.
  * @property {Function[]} methods - the methods that are faked
  * @property {boolean} [shouldClearNativeTimers] inherited from config
+ * @property {number} [warpFactor] inherited from config
  */
 /* eslint-enable jsdoc/require-property-description */
 
@@ -97,6 +98,7 @@ const globalObject = require("@sinonjs/commons").global;
  * @property {boolean} [shouldAdvanceTime] tells FakeTimers to increment mocked time automatically (default false)
  * @property {number} [advanceTimeDelta] increment mocked time every <<advanceTimeDelta>> ms (default: 20ms)
  * @property {boolean} [shouldClearNativeTimers] forwards clear timer calls to native functions if they are not fakes (default: false)
+ * @property {number} [warpFactor] changes the speed by diving all delays and timeouts by the factor (default: 1 / no change)
  */
 
 /* eslint-disable jsdoc/require-property-description */
@@ -550,6 +552,10 @@ function withGlobal(_global) {
                 timer.delay = parseInt(timer.delay, 10);
             }
 
+            if (clock.warpFactor) {
+                timer.delay = timer.delay / clock.warpFactor;
+            }
+
             if (!isNumberFinite(timer.delay)) {
                 timer.delay = 0;
             }
@@ -559,6 +565,11 @@ function withGlobal(_global) {
 
         if (timer.hasOwnProperty("interval")) {
             timer.type = "Interval";
+
+            if (clock.warpFactor) {
+                timer.interval = timer.interval / clock.warpFactor;
+            }
+
             timer.interval = timer.interval > maxTimeout ? 1 : timer.interval;
         }
 
@@ -1650,6 +1661,7 @@ function withGlobal(_global) {
         config.advanceTimeDelta = config.advanceTimeDelta || 20;
         config.shouldClearNativeTimers =
             config.shouldClearNativeTimers || false;
+        config.warpFactor = config.warpFactor || 1;
 
         if (config.target) {
             throw new TypeError(
@@ -1686,6 +1698,26 @@ function withGlobal(_global) {
             );
             clock.attachedInterval = intervalId;
         }
+
+        if (config.warpFactor !== 1) {
+            if (!isNumberFinite(config.warpFactor)) {
+                throw new TypeError(
+                    "config.warpFactor must be a finite number."
+                );
+            }
+            if (config.warpFactor <= 0) {
+                throw new TypeError(
+                    "config.warpFactor must be bigger than 0 (zero)."
+                );
+            }
+            if (config.warpFactor < 1) {
+                warnOnce(
+                    "A warpFactor smaller than 1 will increase the time of all intervals and timeouts."
+                );
+            }
+        }
+
+        clock.warpFactor = config.warpFactor;
 
         if (clock.methods.includes("performance")) {
             const proto = (() => {
