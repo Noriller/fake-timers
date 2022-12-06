@@ -4252,6 +4252,24 @@ describe("FakeTimers", function () {
             }, testDelay);
         });
 
+        it("turns the timeout to zero because of the high warpFactor", function (done) {
+            const testDelay = 100;
+            const date = new Date("2015-09-25");
+            const clock = FakeTimers.install({
+                now: date,
+                shouldAdvanceTime: true,
+                warpFactor: 101,
+            });
+            assert.same(Date.now(), 1443139200000);
+            const timeoutStarted = Date.now();
+            setTimeout(function () {
+                const timeDifference = Date.now() - timeoutStarted;
+                assert.same(timeDifference, 0);
+                clock.uninstall();
+                done();
+            }, testDelay);
+        });
+
         it("should test setImmediate", function (done) {
             if (!setImmediatePresent) {
                 return this.skip();
