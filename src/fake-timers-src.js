@@ -552,13 +552,15 @@ function withGlobal(_global) {
                 timer.delay = parseInt(timer.delay, 10);
             }
 
+            if (!isNumberFinite(timer.delay)) {
+                timer.delay = 0;
+            }
+
+            timer.unwarpedDelay = timer.delay;
             if (clock.warpFactor) {
                 timer.delay = timer.delay / clock.warpFactor;
             }
 
-            if (!isNumberFinite(timer.delay)) {
-                timer.delay = 0;
-            }
             timer.delay = timer.delay > maxTimeout ? 1 : timer.delay;
             timer.delay = Math.max(0, timer.delay);
         }
@@ -566,6 +568,7 @@ function withGlobal(_global) {
         if (timer.hasOwnProperty("interval")) {
             timer.type = "Interval";
 
+            timer.unwarpedInterval = timer.interval;
             if (clock.warpFactor) {
                 timer.interval = timer.interval / clock.warpFactor;
             }
@@ -589,6 +592,9 @@ function withGlobal(_global) {
 
         timer.id = uniqueTimerId++;
         timer.createdAt = clock.now;
+        timer.unwarpedCallAt =
+            clock.now +
+            (parseInt(timer.unwarpedDelay) || (clock.duringTick ? 1 : 0));
         timer.callAt =
             clock.now + (parseInt(timer.delay) || (clock.duringTick ? 1 : 0));
 
@@ -612,6 +618,11 @@ function withGlobal(_global) {
                     timer.callAt =
                         clock.now +
                         (parseInt(timer.delay) || (clock.duringTick ? 1 : 0));
+
+                    timer.unwarpedCallAt =
+                        clock.now +
+                        (parseInt(timer.unwarpedDelay) ||
+                            (clock.duringTick ? 1 : 0));
 
                     // it _might_ have been removed, but if not the assignment is perfectly fine
                     clock.timers[timer.id] = timer;
@@ -638,10 +649,11 @@ function withGlobal(_global) {
      */
     function compareTimers(a, b) {
         // Sort first by absolute timing
-        if (a.callAt < b.callAt) {
+        // using the unwarped times in case of using warpFactor
+        if (a.unwarpedCallAt < b.unwarpedCallAt) {
             return -1;
         }
-        if (a.callAt > b.callAt) {
+        if (a.unwarpedCallAt > b.unwarpedCallAt) {
             return 1;
         }
 
@@ -746,6 +758,7 @@ function withGlobal(_global) {
     function callTimer(clock, timer) {
         if (typeof timer.interval === "number") {
             clock.timers[timer.id].callAt += timer.interval;
+            clock.timers[timer.id].unwarpedCallAt += timer.unwarpedInterval;
         } else {
             delete clock.timers[timer.id];
         }
@@ -1607,6 +1620,7 @@ function withGlobal(_global) {
                     timer = clock.timers[id];
                     timer.createdAt += difference;
                     timer.callAt += difference;
+                    timer.unwarpedCallAt += difference;
                 }
             }
         };
