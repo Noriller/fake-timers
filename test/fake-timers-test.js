@@ -930,6 +930,426 @@ describe("FakeTimers", function () {
         });
     });
 
+    describe("tick/warpFactor", function () {
+        beforeEach(function () {
+            this.clock = FakeTimers.install({ now: 0, warpFactor: 10 });
+        });
+
+        afterEach(function () {
+            this.clock.uninstall();
+        });
+
+        it("triggers immediately without specified delay", function () {
+            const stub = sinon.stub();
+            this.clock.setTimeout(stub);
+
+            this.clock.tick(0);
+
+            assert(stub.called);
+        });
+
+        it("does not trigger without sufficient delay", function () {
+            const stub = sinon.stub();
+            this.clock.setTimeout(stub, 100);
+            this.clock.tick(9);
+
+            assert.isFalse(stub.called);
+        });
+
+        it("triggers after sufficient delay", function () {
+            const stub = sinon.stub();
+            this.clock.setTimeout(stub, 100);
+            this.clock.tick(10);
+
+            assert(stub.called);
+        });
+
+        it("triggers simultaneous timers", function () {
+            const spies = [sinon.spy(), sinon.spy()];
+            this.clock.setTimeout(spies[0], 100);
+            this.clock.setTimeout(spies[1], 100);
+
+            this.clock.tick(10);
+
+            assert(spies[0].called);
+            assert(spies[1].called);
+        });
+
+        it("triggers multiple simultaneous timers", function () {
+            const spies = [sinon.spy(), sinon.spy(), sinon.spy(), sinon.spy()];
+            this.clock.setTimeout(spies[0], 100);
+            this.clock.setTimeout(spies[1], 100);
+            this.clock.setTimeout(spies[2], 99);
+            this.clock.setTimeout(spies[3], 100);
+
+            this.clock.tick(10);
+
+            assert(spies[0].called);
+            assert(spies[1].called);
+            assert(spies[2].called);
+            assert(spies[3].called);
+        });
+
+        it("triggers multiple simultaneous timers with zero callAt", function () {
+            const test = this;
+            const spies = [
+                sinon.spy(function () {
+                    test.clock.setTimeout(spies[1], 0);
+                }),
+                sinon.spy(),
+                sinon.spy(),
+            ];
+
+            // First spy calls another setTimeout with delay=0
+            this.clock.setTimeout(spies[0], 0);
+            this.clock.setTimeout(spies[2], 10);
+
+            this.clock.tick(1);
+
+            assert(spies[0].called);
+            assert(spies[1].called);
+            assert(spies[2].called);
+        });
+
+        it("waits after setTimeout was called", function () {
+            this.clock.tick(100);
+            const stub = sinon.stub();
+            this.clock.setTimeout(stub, 150);
+            this.clock.tick(5);
+
+            assert.isFalse(stub.called);
+            this.clock.tick(10);
+            assert(stub.called);
+        });
+
+        it("mini integration test", function () {
+            const stubs = [sinon.stub(), sinon.stub(), sinon.stub()];
+            this.clock.setTimeout(stubs[0], 100);
+            this.clock.setTimeout(stubs[1], 120);
+            this.clock.tick(1);
+            this.clock.tick(8.9);
+            assert.isFalse(stubs[0].called);
+            assert.isFalse(stubs[1].called);
+            this.clock.setTimeout(stubs[2], 20);
+            this.clock.tick(0.1);
+            assert(stubs[0].called);
+            assert.isFalse(stubs[1].called);
+            assert.isFalse(stubs[2].called);
+            this.clock.tick(1.9);
+            assert.isFalse(stubs[1].called);
+            assert(stubs[2].called);
+            this.clock.tick(0.1);
+            assert(stubs[1].called);
+        });
+
+        it("triggers even when some throw", function () {
+            const clock = this.clock;
+            const stubs = [sinon.stub().throws(), sinon.stub()];
+
+            clock.setTimeout(stubs[0], 100);
+            clock.setTimeout(stubs[1], 120);
+
+            assert.exception(function () {
+                clock.tick(12);
+            });
+
+            assert(stubs[0].called);
+            assert(stubs[1].called);
+        });
+
+        it("calls function with global object or null (strict mode) as this", function () {
+            const clock = this.clock;
+            const stub = sinon.stub().throws();
+            clock.setTimeout(stub, 100);
+
+            assert.exception(function () {
+                clock.tick(10);
+            });
+
+            assert(stub.calledOn(global) || stub.calledOn(null));
+        });
+
+        it("triggers in the order scheduled", function () {
+            const spies = [sinon.spy(), sinon.spy()];
+            this.clock.setTimeout(spies[0], 130);
+            this.clock.setTimeout(spies[1], 110);
+
+            this.clock.tick(15);
+
+            assert(spies[1].calledBefore(spies[0]));
+        });
+
+        it("creates updated Date while ticking", function () {
+            const spy = sinon.spy();
+
+            this.clock.setInterval(function () {
+                spy(new Date().getTime());
+            }, 10);
+
+            this.clock.tick(10);
+
+            assert.equals(spy.callCount, 10);
+            assert(spy.calledWith(1));
+            assert(spy.calledWith(2));
+            assert(spy.calledWith(3));
+            assert(spy.calledWith(4));
+            assert(spy.calledWith(5));
+            assert(spy.calledWith(6));
+            assert(spy.calledWith(7));
+            assert(spy.calledWith(8));
+            assert(spy.calledWith(9));
+            assert(spy.calledWith(10));
+        });
+
+        it("fires timer in intervals of 13", function () {
+            const spy = sinon.spy();
+            this.clock.setInterval(spy, 13);
+
+            this.clock.tick(50);
+
+            assert.equals(spy.callCount, 38);
+        });
+
+        it("fires timer in intervals of '13'", function () {
+            const spy = sinon.spy();
+            this.clock.setInterval(spy, "13");
+
+            this.clock.tick(50);
+
+            assert.equals(spy.callCount, 38);
+        });
+
+        it("fires timers in correct order", function () {
+            const spy13 = sinon.spy();
+            const spy10 = sinon.spy();
+
+            this.clock.setInterval(function () {
+                spy13(new Date().getTime());
+            }, 130);
+
+            this.clock.setInterval(function () {
+                spy10(new Date().getTime());
+            }, 100);
+
+            this.clock.tick(500);
+
+            assert.equals(spy13.callCount, 38);
+            assert.equals(spy10.callCount, 50);
+
+            assert(spy13.calledWith(416));
+            assert(spy10.calledWith(320));
+
+            assert(spy10.getCall(0).calledBefore(spy13.getCall(0)));
+            assert(spy10.getCall(4).calledBefore(spy13.getCall(3)));
+        });
+
+        it("triggers timeouts and intervals in the order scheduled", function () {
+            const spies = [sinon.spy(), sinon.spy()];
+            this.clock.setInterval(spies[0], 10);
+            this.clock.setTimeout(spies[1], 50);
+
+            this.clock.tick(10);
+
+            assert(spies[0].calledBefore(spies[1]));
+            assert.equals(spies[0].callCount, 10);
+            assert.equals(spies[1].callCount, 1);
+        });
+
+        it("does not fire canceled intervals", function () {
+            // ESLint fails to detect this correctly
+            /* eslint-disable prefer-const */
+            let id;
+            const callback = sinon.spy(function () {
+                if (callback.callCount === 3) {
+                    clearInterval(id);
+                }
+            });
+
+            id = this.clock.setInterval(callback, 10);
+            this.clock.tick(10);
+
+            assert.equals(callback.callCount, 3);
+        });
+
+        it("passes 8 seconds", function () {
+            const spy = sinon.spy();
+            this.clock.setInterval(spy, 40000);
+
+            this.clock.tick("08");
+
+            assert.equals(spy.callCount, 2);
+        });
+
+        it("passes 1 minute", function () {
+            const spy = sinon.spy();
+            this.clock.setInterval(spy, 60000);
+
+            this.clock.tick("01:00");
+
+            assert.equals(spy.callCount, 10);
+        });
+
+        it("passes 2 hours, 34 minutes and 10 seconds", function () {
+            const spy = sinon.spy();
+            this.clock.setInterval(spy, 100000);
+
+            this.clock.tick("02:34:10");
+
+            assert.equals(spy.callCount, 925);
+        });
+
+        it("throws for invalid format", function () {
+            const spy = sinon.spy();
+            this.clock.setInterval(spy, 10000);
+            const test = this;
+
+            assert.exception(function () {
+                test.clock.tick("12:02:34:10");
+            });
+
+            assert.equals(spy.callCount, 0);
+        });
+
+        it("throws for invalid minutes", function () {
+            const spy = sinon.spy();
+            this.clock.setInterval(spy, 10000);
+            const test = this;
+
+            assert.exception(function () {
+                test.clock.tick("67:10");
+            });
+
+            assert.equals(spy.callCount, 0);
+        });
+
+        it("throws for negative minutes", function () {
+            const spy = sinon.spy();
+            this.clock.setInterval(spy, 10000);
+            const test = this;
+
+            assert.exception(function () {
+                test.clock.tick("-7:10");
+            });
+
+            assert.equals(spy.callCount, 0);
+        });
+
+        it("treats missing argument as 0", function () {
+            this.clock.tick();
+
+            assert.equals(this.clock.now, 0);
+        });
+
+        it("fires nested setTimeout calls properly", function () {
+            let i = 0;
+            const clock = this.clock;
+
+            const callback = function () {
+                ++i;
+                clock.setTimeout(function () {
+                    callback();
+                }, 100);
+            };
+
+            callback();
+
+            clock.tick(100);
+
+            assert.equals(i, 11);
+        });
+
+        it("does not silently catch errors", function () {
+            const clock = this.clock;
+
+            clock.setTimeout(function () {
+                throw new Error("oh no!");
+            }, 1000);
+
+            assert.exception(function () {
+                clock.tick(1000);
+            });
+        });
+
+        it("returns the current now value", function () {
+            const clock = this.clock;
+            const value = clock.tick(200);
+            assert.equals(clock.now, value);
+        });
+
+        it("is not influenced by forward system clock changes", function () {
+            const clock = this.clock;
+            const callback = function () {
+                clock.setSystemTime(new clock.Date().getTime() + 1000);
+            };
+            const stub = sinon.stub();
+            clock.setTimeout(callback, 1000);
+            clock.setTimeout(stub, 2000);
+            clock.tick(199);
+            assert.equals(stub.callCount, 0);
+            clock.tick(2);
+            assert.equals(stub.callCount, 1);
+        });
+
+        it("is not influenced by forward system clock changes 2", function () {
+            const clock = this.clock;
+            const callback = function () {
+                clock.setSystemTime(new clock.Date().getTime() - 1000);
+            };
+            const stub = sinon.stub();
+            clock.setTimeout(callback, 1000);
+            clock.setTimeout(stub, 2000);
+            clock.tick(199);
+            assert.equals(stub.callCount, 0);
+            clock.tick(2);
+            assert.equals(stub.callCount, 1);
+        });
+
+        it("is not influenced by forward system clock changes when an error is thrown", function () {
+            const clock = this.clock;
+            const callback = function () {
+                clock.setSystemTime(new clock.Date().getTime() + 1000);
+                throw new Error();
+            };
+            const stub = sinon.stub();
+            clock.setTimeout(callback, 1000);
+            clock.setTimeout(stub, 2000);
+            assert.exception(function () {
+                clock.tick(199);
+            });
+            assert.equals(stub.callCount, 0);
+            clock.tick(2);
+            assert.equals(stub.callCount, 1);
+        });
+
+        it("is not influenced by forward system clock changes when an error is thrown 2", function () {
+            const clock = this.clock;
+            const callback = function () {
+                clock.setSystemTime(new clock.Date().getTime() - 1000);
+                throw new Error();
+            };
+            const stub = sinon.stub();
+            clock.setTimeout(callback, 1000);
+            clock.setTimeout(stub, 2000);
+            assert.exception(function () {
+                clock.tick(199);
+            });
+            assert.equals(stub.callCount, 0);
+            clock.tick(2);
+            assert.equals(stub.callCount, 1);
+        });
+
+        it("throws on negative ticks", function () {
+            const clock = this.clock;
+
+            assert.exception(
+                function () {
+                    clock.tick(-500);
+                },
+                { message: "Negative ticks are not supported" }
+            );
+        });
+    });
+
     describe("tickAsync", function () {
         before(function () {
             if (!promisePresent) {
