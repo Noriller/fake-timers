@@ -3808,6 +3808,134 @@ describe("FakeTimers", function () {
         });
     });
 
+    describe("warpFactor", function () {
+        afterEach(function () {
+            sinon.restore();
+        });
+
+        it("should advance the timer 10 times faster", function (done) {
+            const testDelay = 100;
+            const date = new Date("2015-09-25");
+            const warpFactor = 10;
+            const clock = FakeTimers.install({
+                now: date,
+                shouldAdvanceTime: true,
+                warpFactor,
+            });
+            assert.same(Date.now(), 1443139200000);
+            const timeoutStarted = Date.now();
+            setTimeout(function () {
+                const timeDifference = Date.now() - timeoutStarted;
+                assert.same(timeDifference, testDelay / warpFactor);
+                clock.uninstall();
+                done();
+            }, testDelay);
+        });
+
+        it("should test setImmediate", function (done) {
+            if (!setImmediatePresent) {
+                return this.skip();
+            }
+
+            const date = new Date("2015-09-25");
+            const clock = FakeTimers.install({
+                now: date,
+                shouldAdvanceTime: true,
+                warpFactor: 10,
+            });
+            assert.same(Date.now(), 1443139200000);
+            const timeoutStarted = Date.now();
+
+            setImmediate(function () {
+                const timeDifference = Date.now() - timeoutStarted;
+                assert.same(timeDifference, 0);
+                clock.uninstall();
+                done();
+            });
+        });
+
+        it("should test setInterval", function (done) {
+            const interval = 100;
+            let intervalsTriggered = 0;
+            const warpFactor = 10;
+            const cyclesToTrigger = 3;
+            const date = new Date("2015-09-25");
+            const clock = FakeTimers.install({
+                now: date,
+                shouldAdvanceTime: true,
+                warpFactor,
+            });
+            assert.same(Date.now(), 1443139200000);
+            const timeoutStarted = Date.now();
+
+            const intervalId = setInterval(function () {
+                if (++intervalsTriggered === cyclesToTrigger) {
+                    clearInterval(intervalId);
+                    const timeDifference = Date.now() - timeoutStarted;
+                    assert.same(
+                        timeDifference,
+                        (interval / warpFactor) * cyclesToTrigger
+                    );
+                    clock.uninstall();
+                    done();
+                }
+            }, interval);
+        });
+
+        it("should not depend on having to stub setInterval or clearInterval to work", function (done) {
+            const origSetInterval = globalObject.setInterval;
+            const origClearInterval = globalObject.clearInterval;
+
+            const clock = FakeTimers.install({
+                shouldAdvanceTime: true,
+                toFake: ["setTimeout"],
+                warpFactor: 10,
+            });
+
+            assert.equals(globalObject.setInterval, origSetInterval);
+            assert.equals(globalObject.clearInterval, origClearInterval);
+
+            setTimeout(function () {
+                clock.uninstall();
+                done();
+            }, 0);
+        });
+
+        it("outputs a warning once if not enabled", function (done) {
+            const stub = sinon.stub(globalObject.console, "warn");
+
+            const clock = FakeTimers.install({
+                shouldAdvanceTime: true,
+                warpFactor: 0.5,
+            });
+
+            setTimeout(function () {
+                assert.equals(stub.callCount, 1);
+                clock.uninstall();
+                done();
+            }, 1);
+        });
+
+        it("should advance the timer 2 times slower", function (done) {
+            const testDelay = 20;
+            const date = new Date("2015-09-25");
+            const warpFactor = 0.5;
+            const clock = FakeTimers.install({
+                now: date,
+                shouldAdvanceTime: true,
+                warpFactor,
+            });
+            assert.same(Date.now(), 1443139200000);
+            const timeoutStarted = Date.now();
+            setTimeout(function () {
+                const timeDifference = Date.now() - timeoutStarted;
+                assert.same(timeDifference, testDelay / warpFactor);
+                clock.uninstall();
+                done();
+            }, testDelay);
+        });
+    });
+
     describe("shouldClearNativeTimers", function () {
         function createCallback(done, succeed) {
             return function () {
