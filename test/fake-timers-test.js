@@ -932,7 +932,7 @@ describe("FakeTimers", function () {
 
     describe("tick/warpFactor", function () {
         beforeEach(function () {
-            this.clock = FakeTimers.install({ now: 0, warpFactor: 10 });
+            this.clock = FakeTimers.install({ now: 0, warpFactor: 1000 });
         });
 
         afterEach(function () {
@@ -950,8 +950,8 @@ describe("FakeTimers", function () {
 
         it("does not trigger without sufficient delay", function () {
             const stub = sinon.stub();
-            this.clock.setTimeout(stub, 100);
-            this.clock.tick(9);
+            this.clock.setTimeout(stub, 2000);
+            this.clock.tick(1);
 
             assert.isFalse(stub.called);
         });
@@ -959,7 +959,7 @@ describe("FakeTimers", function () {
         it("triggers after sufficient delay", function () {
             const stub = sinon.stub();
             this.clock.setTimeout(stub, 100);
-            this.clock.tick(10);
+            this.clock.tick(1);
 
             assert(stub.called);
         });
@@ -969,7 +969,7 @@ describe("FakeTimers", function () {
             this.clock.setTimeout(spies[0], 100);
             this.clock.setTimeout(spies[1], 100);
 
-            this.clock.tick(10);
+            this.clock.tick(1);
 
             assert(spies[0].called);
             assert(spies[1].called);
@@ -982,7 +982,7 @@ describe("FakeTimers", function () {
             this.clock.setTimeout(spies[2], 99);
             this.clock.setTimeout(spies[3], 100);
 
-            this.clock.tick(10);
+            this.clock.tick(1);
 
             assert(spies[0].called);
             assert(spies[1].called);
@@ -1014,31 +1014,31 @@ describe("FakeTimers", function () {
         it("waits after setTimeout was called", function () {
             this.clock.tick(100);
             const stub = sinon.stub();
-            this.clock.setTimeout(stub, 150);
-            this.clock.tick(5);
+            this.clock.setTimeout(stub, 2000);
+            this.clock.tick(1);
 
             assert.isFalse(stub.called);
-            this.clock.tick(10);
+            this.clock.tick(1);
             assert(stub.called);
         });
 
         it("mini integration test", function () {
             const stubs = [sinon.stub(), sinon.stub(), sinon.stub()];
-            this.clock.setTimeout(stubs[0], 100);
-            this.clock.setTimeout(stubs[1], 120);
+            this.clock.setTimeout(stubs[0], 4000);
+            this.clock.setTimeout(stubs[1], 7000);
             this.clock.tick(1);
-            this.clock.tick(8.9);
+            this.clock.tick(2);
             assert.isFalse(stubs[0].called);
             assert.isFalse(stubs[1].called);
-            this.clock.setTimeout(stubs[2], 20);
-            this.clock.tick(0.1);
+            this.clock.setTimeout(stubs[2], 2000);
+            this.clock.tick(1);
             assert(stubs[0].called);
             assert.isFalse(stubs[1].called);
             assert.isFalse(stubs[2].called);
-            this.clock.tick(1.9);
+            this.clock.tick(2);
             assert.isFalse(stubs[1].called);
             assert(stubs[2].called);
-            this.clock.tick(0.1);
+            this.clock.tick(1);
             assert(stubs[1].called);
         });
 
@@ -1050,7 +1050,7 @@ describe("FakeTimers", function () {
             clock.setTimeout(stubs[1], 120);
 
             assert.exception(function () {
-                clock.tick(12);
+                clock.tick(1);
             });
 
             assert(stubs[0].called);
@@ -1063,7 +1063,7 @@ describe("FakeTimers", function () {
             clock.setTimeout(stub, 100);
 
             assert.exception(function () {
-                clock.tick(10);
+                clock.tick(1);
             });
 
             assert(stub.calledOn(global) || stub.calledOn(null));
@@ -1074,7 +1074,7 @@ describe("FakeTimers", function () {
             this.clock.setTimeout(spies[0], 130);
             this.clock.setTimeout(spies[1], 110);
 
-            this.clock.tick(15);
+            this.clock.tick(1);
 
             assert(spies[1].calledBefore(spies[0]));
         });
@@ -1084,7 +1084,7 @@ describe("FakeTimers", function () {
 
             this.clock.setInterval(function () {
                 spy(new Date().getTime());
-            }, 10);
+            }, 1000);
 
             this.clock.tick(10);
 
@@ -1101,57 +1101,62 @@ describe("FakeTimers", function () {
             assert(spy.calledWith(10));
         });
 
-        it("fires timer in intervals of 13", function () {
+        it("fires timer in intervals of '130'", function () {
             const spy = sinon.spy();
-            this.clock.setInterval(spy, 13);
+            this.clock.setInterval(spy, "130");
 
-            this.clock.tick(50);
+            this.clock.tick(5);
 
-            assert.equals(spy.callCount, 38);
-        });
-
-        it("fires timer in intervals of '13'", function () {
-            const spy = sinon.spy();
-            this.clock.setInterval(spy, "13");
-
-            this.clock.tick(50);
-
-            assert.equals(spy.callCount, 38);
+            assert.equals(spy.callCount, 39);
         });
 
         it("fires timers in correct order", function () {
-            const spy13 = sinon.spy();
-            const spy10 = sinon.spy();
+            const spy130 = sinon.spy();
+            const spy100 = sinon.spy();
 
             this.clock.setInterval(function () {
-                spy13(new Date().getTime());
+                spy130(new Date().getTime());
             }, 130);
 
             this.clock.setInterval(function () {
-                spy10(new Date().getTime());
+                spy100(new Date().getTime());
             }, 100);
 
-            this.clock.tick(500);
+            this.clock.tick(5);
 
-            assert.equals(spy13.callCount, 38);
-            assert.equals(spy10.callCount, 50);
+            assert.equals(spy130.callCount, 39);
+            assert.equals(spy100.callCount, 51);
 
-            assert(spy13.calledWith(416));
-            assert(spy10.calledWith(320));
+            assert(spy130.calledWith(4));
+            assert(spy100.calledWith(4));
 
-            assert(spy10.getCall(0).calledBefore(spy13.getCall(0)));
-            assert(spy10.getCall(4).calledBefore(spy13.getCall(3)));
+            assert(spy100.getCall(0).calledBefore(spy130.getCall(0)));
+            assert(spy100.getCall(4).calledBefore(spy130.getCall(3)));
         });
 
         it("triggers timeouts and intervals in the order scheduled", function () {
             const spies = [sinon.spy(), sinon.spy()];
-            this.clock.setInterval(spies[0], 10);
-            this.clock.setTimeout(spies[1], 50);
 
-            this.clock.tick(10);
+            this.clock.setInterval(spies[0], 50);
+            this.clock.setTimeout(spies[1], 10);
 
-            assert(spies[0].calledBefore(spies[1]));
-            assert.equals(spies[0].callCount, 10);
+            this.clock.tick(1);
+
+            assert(spies[1].calledBefore(spies[0]));
+            assert.equals(spies[0].callCount, 20);
+            assert.equals(spies[1].callCount, 1);
+        });
+
+        it("triggers timeouts and intervals in the order scheduled 2", function () {
+            const spies = [sinon.spy(), sinon.spy()];
+
+            this.clock.setInterval(spies[0], 5);
+            this.clock.setTimeout(spies[1], 10);
+
+            this.clock.tick(1);
+
+            assert(spies[1].calledBefore(spies[0]));
+            assert.equals(spies[0].callCount, 200);
             assert.equals(spies[1].callCount, 1);
         });
 
@@ -1166,18 +1171,18 @@ describe("FakeTimers", function () {
             });
 
             id = this.clock.setInterval(callback, 10);
-            this.clock.tick(10);
+            this.clock.tick(1);
 
             assert.equals(callback.callCount, 3);
         });
 
         it("passes 8 seconds", function () {
             const spy = sinon.spy();
-            this.clock.setInterval(spy, 40000);
+            this.clock.setInterval(spy, 4000);
 
             this.clock.tick("08");
 
-            assert.equals(spy.callCount, 2);
+            assert.equals(spy.callCount, 2000);
         });
 
         it("passes 1 minute", function () {
@@ -1186,12 +1191,12 @@ describe("FakeTimers", function () {
 
             this.clock.tick("01:00");
 
-            assert.equals(spy.callCount, 10);
+            assert.equals(spy.callCount, 1000);
         });
 
         it("passes 2 hours, 34 minutes and 10 seconds", function () {
             const spy = sinon.spy();
-            this.clock.setInterval(spy, 100000);
+            this.clock.setInterval(spy, 10000000);
 
             this.clock.tick("02:34:10");
 
@@ -1253,9 +1258,9 @@ describe("FakeTimers", function () {
 
             callback();
 
-            clock.tick(100);
+            clock.tick(1);
 
-            assert.equals(i, 11);
+            assert.equals(i, 3);
         });
 
         it("does not silently catch errors", function () {
@@ -1279,12 +1284,12 @@ describe("FakeTimers", function () {
         it("is not influenced by forward system clock changes", function () {
             const clock = this.clock;
             const callback = function () {
-                clock.setSystemTime(new clock.Date().getTime() + 1000);
+                clock.setSystemTime(new clock.Date().getTime() + 10000);
             };
             const stub = sinon.stub();
-            clock.setTimeout(callback, 1000);
-            clock.setTimeout(stub, 2000);
-            clock.tick(199);
+            clock.setTimeout(callback, 10000);
+            clock.setTimeout(stub, 20000);
+            clock.tick(19);
             assert.equals(stub.callCount, 0);
             clock.tick(2);
             assert.equals(stub.callCount, 1);
@@ -1293,12 +1298,12 @@ describe("FakeTimers", function () {
         it("is not influenced by forward system clock changes 2", function () {
             const clock = this.clock;
             const callback = function () {
-                clock.setSystemTime(new clock.Date().getTime() - 1000);
+                clock.setSystemTime(new clock.Date().getTime() - 10000);
             };
             const stub = sinon.stub();
-            clock.setTimeout(callback, 1000);
-            clock.setTimeout(stub, 2000);
-            clock.tick(199);
+            clock.setTimeout(callback, 10000);
+            clock.setTimeout(stub, 20000);
+            clock.tick(19);
             assert.equals(stub.callCount, 0);
             clock.tick(2);
             assert.equals(stub.callCount, 1);
@@ -1307,14 +1312,14 @@ describe("FakeTimers", function () {
         it("is not influenced by forward system clock changes when an error is thrown", function () {
             const clock = this.clock;
             const callback = function () {
-                clock.setSystemTime(new clock.Date().getTime() + 1000);
+                clock.setSystemTime(new clock.Date().getTime() + 10000);
                 throw new Error();
             };
             const stub = sinon.stub();
-            clock.setTimeout(callback, 1000);
-            clock.setTimeout(stub, 2000);
+            clock.setTimeout(callback, 10000);
+            clock.setTimeout(stub, 20000);
             assert.exception(function () {
-                clock.tick(199);
+                clock.tick(19);
             });
             assert.equals(stub.callCount, 0);
             clock.tick(2);
@@ -1324,14 +1329,14 @@ describe("FakeTimers", function () {
         it("is not influenced by forward system clock changes when an error is thrown 2", function () {
             const clock = this.clock;
             const callback = function () {
-                clock.setSystemTime(new clock.Date().getTime() - 1000);
+                clock.setSystemTime(new clock.Date().getTime() - 10000);
                 throw new Error();
             };
             const stub = sinon.stub();
-            clock.setTimeout(callback, 1000);
-            clock.setTimeout(stub, 2000);
+            clock.setTimeout(callback, 10000);
+            clock.setTimeout(stub, 20000);
             assert.exception(function () {
-                clock.tick(199);
+                clock.tick(19);
             });
             assert.equals(stub.callCount, 0);
             clock.tick(2);
